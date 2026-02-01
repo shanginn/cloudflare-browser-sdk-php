@@ -17,6 +17,7 @@ use Shanginn\CloudflareBrowser\Requests\Common\Cookie;
 use Shanginn\CloudflareBrowser\Enums\PdfFormat;
 use Shanginn\CloudflareBrowser\Enums\ImageFormat;
 use Shanginn\CloudflareBrowser\Enums\WaitUntil;
+use Shanginn\CloudflareBrowser\Exceptions\CloudflareRateLimitException;
 use Spiral\JsonSchemaGenerator\Attribute\Field;
 use Symfony\Component\Dotenv\Dotenv;
 
@@ -46,17 +47,58 @@ $browser = new CloudflareBrowser($client);
 
 $testResults = [];
 
-function sleepTenSecond(): void
+/**
+ * Execute a test with automatic rate limit handling.
+ * If rate limited, waits for the specified duration and retries once.
+ */
+function runTest(
+    string $testName,
+    CloudflareBrowser $browser,
+    callable $testFn
+): array {
+    $maxRetries = 2;
+    $attempt = 0;
+    
+    while ($attempt < $maxRetries) {
+        $attempt++;
+        
+        try {
+            return ['success' => true, 'result' => $testFn()];
+        } catch (CloudflareRateLimitException $e) {
+            $retryAfter = $e->retryAfter ?: 10;
+            echo "   ⚠️  Rate limited! Waiting {$retryAfter} seconds...\n";
+            sleep($retryAfter);
+            
+            if ($attempt >= $maxRetries) {
+                echo "❌ {$testName} FAILED - Rate limit exceeded after {$maxRetries} attempts\n";
+                return ['success' => false, 'error' => $e->getMessage()];
+            }
+            
+            echo "   Retrying...\n";
+        } catch (Exception $e) {
+            dump($e);
+            echo "❌ {$testName} FAILED - " . $e->getMessage() . "\n";
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+    
+    return ['success' => false, 'error' => 'Max retries exceeded'];
+}
+
+/**
+ * Sleep between tests to avoid rate limits.
+ */
+function sleepBetweenTests(): void
 {
-    echo "   (sleeping 10s...)\n";
-    sleep(10);
+    echo "   (sleeping 1s between tests...)\n";
+    sleep(1);
 }
 
 // ==========================================
 // Test 1: /screenshot - Capture Screenshot
 // ==========================================
 echo "Test 1: Capturing screenshot of example.com...\n";
-try {
+$result = runTest('Screenshot', $browser, function() use ($browser) {
     $screenshot = $browser->screenshot(new ScreenshotRequest(
         url: 'https://example.com',
         screenshotOptions: ['fullPage' => false]
@@ -68,26 +110,21 @@ try {
     
     // Verify it's a PNG (check magic bytes)
     $pngMagicBytes = pack('H*', '89504E47');
-    if (str_starts_with($screenshot, $pngMagicBytes)) {
-        echo "✅ Screenshot test PASSED - Saved as {$filename} (" . strlen($screenshot) . " bytes)\n";
-        $testResults['screenshot'] = true;
-    } else {
-        echo "⚠️ Screenshot test WARNING - Saved but may not be a valid PNG\n";
-        $testResults['screenshot'] = true;
+    if (!str_starts_with($screenshot, $pngMagicBytes)) {
+        throw new Exception('Not a valid PNG file');
     }
-} catch (Exception $e) {
-    dump($e);
-    echo "❌ Screenshot test FAILED - " . $e->getMessage() . "\n";
-    $testResults['screenshot'] = false;
-}
-echo "\n";
-sleepTenSecond();
+    
+    echo "✅ Screenshot test PASSED - Saved as {$filename} (" . strlen($screenshot) . " bytes)\n";
+    return true;
+});
+$testResults['screenshot'] = $result['success'];
+sleepBetweenTests();
 
 // ==========================================
 // Test 2: /pdf - Generate PDF
 // ==========================================
 echo "Test 2: Generating PDF from example.com...\n";
-try {
+$result = runTest('PDF', $browser, function() use ($browser) {
     $pdf = $browser->pdf(new PdfRequest(
         url: 'https://example.com',
         format: PdfFormat::A4
@@ -98,121 +135,96 @@ try {
     file_put_contents($filename, $pdf);
     
     // Verify it's a PDF (check magic bytes %PDF)
-    if (str_starts_with($pdf, '%PDF')) {
-        echo "✅ PDF test PASSED - Saved as {$filename} (" . strlen($pdf) . " bytes)\n";
-        $testResults['pdf'] = true;
-    } else {
-        echo "⚠️ PDF test WARNING - Saved but may not be a valid PDF\n";
-        $testResults['pdf'] = true;
+    if (!str_starts_with($pdf, '%PDF')) {
+        throw new Exception('Not a valid PDF file');
     }
-} catch (Exception $e) {
-    dump($e);
-    echo "❌ PDF test FAILED - " . $e->getMessage() . "\n";
-    $testResults['pdf'] = false;
-}
-echo "\n";
-sleepTenSecond();
+    
+    echo "✅ PDF test PASSED - Saved as {$filename} (" . strlen($pdf) . " bytes)\n";
+    return true;
+});
+$testResults['pdf'] = $result['success'];
+sleepBetweenTests();
 
 // ==========================================
 // Test 3: /snapshot - Take Snapshot
 // ==========================================
 echo "Test 3: Taking snapshot of example.com...\n";
-try {
+$result = runTest('Snapshot', $browser, function() use ($browser) {
     $snapshot = $browser->snapshot(new SnapshotRequest(
         url: 'https://example.com'
     ));
     
-    if (!empty($snapshot->url) || !empty($snapshot->content)) {
-        echo "✅ Snapshot test PASSED\n";
-        echo "   URL: " . ($snapshot->url ?? 'N/A') . "\n";
-        echo "   Title: " . ($snapshot->title ?? 'N/A') . "\n";
-        echo "   Content length: " . strlen($snapshot->content ?? '') . " bytes\n";
-        $testResults['snapshot'] = true;
-    } else {
-        echo "❌ Snapshot test FAILED - Empty result\n";
-        $testResults['snapshot'] = false;
+    if (empty($snapshot->url) && empty($snapshot->content)) {
+        throw new Exception('Empty result');
     }
-} catch (Exception $e) {
-    dump($e);
-    echo "❌ Snapshot test FAILED - " . $e->getMessage() . "\n";
-    $testResults['snapshot'] = false;
-}
-echo "\n";
-sleepTenSecond();
+    
+    echo "✅ Snapshot test PASSED\n";
+    echo "   URL: " . ($snapshot->url ?: 'N/A') . "\n";
+    echo "   Title: " . ($snapshot->title ?: 'N/A') . "\n";
+    echo "   Content length: " . strlen($snapshot->content) . " bytes\n";
+    return true;
+});
+$testResults['snapshot'] = $result['success'];
+sleepBetweenTests();
 
 // ==========================================
 // Test 4: /content - Fetch HTML
 // ==========================================
 echo "Test 4: Fetching HTML content from example.com...\n";
-try {
+$result = runTest('Content', $browser, function() use ($browser) {
     $html = $browser->content('https://example.com');
     
-    if (strlen($html) > 0 && str_contains($html, 'Example Domain')) {
-        echo "✅ Content test PASSED - Received " . strlen($html) . " bytes\n";
-        $testResults['content'] = true;
-    } else {
-        echo "❌ Content test FAILED - Unexpected content\n";
-        $testResults['content'] = false;
+    if (strlen($html) === 0 || !str_contains($html, 'Example Domain')) {
+        throw new Exception('Unexpected content');
     }
-} catch (Exception $e) {
-    dump($e);
-    echo "❌ Content test FAILED - " . $e->getMessage() . "\n";
-    $testResults['content'] = false;
-}
-echo "\n";
-sleepTenSecond();
+    
+    echo "✅ Content test PASSED - Received " . strlen($html) . " bytes\n";
+    return true;
+});
+$testResults['content'] = $result['success'];
+sleepBetweenTests();
 
 // ==========================================
 // Test 5: /markdown - Extract Markdown
 // ==========================================
 echo "Test 5: Extracting Markdown from example.com...\n";
-try {
+$result = runTest('Markdown', $browser, function() use ($browser) {
     $markdown = $browser->markdown('https://example.com');
     
-    if (strlen($markdown) > 0 && str_contains($markdown, 'Example Domain')) {
-        echo "✅ Markdown test PASSED\n";
-        echo "   Preview: " . substr($markdown, 0, 100) . "...\n";
-        $testResults['markdown'] = true;
-    } else {
-        echo "❌ Markdown test FAILED - Unexpected content\n";
-        $testResults['markdown'] = false;
+    if (strlen($markdown) === 0 || !str_contains($markdown, 'Example Domain')) {
+        throw new Exception('Unexpected content');
     }
-} catch (Exception $e) {
-    dump($e);
-    echo "❌ Markdown test FAILED - " . $e->getMessage() . "\n";
-    $testResults['markdown'] = false;
-}
-echo "\n";
-sleepTenSecond();
+    
+    echo "✅ Markdown test PASSED\n";
+    echo "   Preview: " . substr($markdown, 0, 100) . "...\n";
+    return true;
+});
+$testResults['markdown'] = $result['success'];
+sleepBetweenTests();
 
 // ==========================================
 // Test 6: /links - Retrieve Links
 // ==========================================
 echo "Test 6: Retrieving links from example.com...\n";
-try {
+$result = runTest('Links', $browser, function() use ($browser) {
     $links = $browser->links('https://example.com');
     
-    if (is_array($links) && count($links) > 0) {
-        echo "✅ Links test PASSED - Found " . count($links) . " links\n";
-        echo "   First link: " . $links[0] . "\n";
-        $testResults['links'] = true;
-    } else {
-        echo "❌ Links test FAILED - No links found\n";
-        $testResults['links'] = false;
+    if (!is_array($links) || count($links) === 0) {
+        throw new Exception('No links found');
     }
-} catch (Exception $e) {
-    dump($e);
-    echo "❌ Links test FAILED - " . $e->getMessage() . "\n";
-    $testResults['links'] = false;
-}
-echo "\n";
-sleepTenSecond();
+    
+    echo "✅ Links test PASSED - Found " . count($links) . " links\n";
+    echo "   First link: " . $links[0] . "\n";
+    return true;
+});
+$testResults['links'] = $result['success'];
+sleepBetweenTests();
 
 // ==========================================
 // Test 7: /scrape - Scrape Elements
 // ==========================================
 echo "Test 7: Scraping elements from example.com...\n";
-try {
+$result = runTest('Scrape', $browser, function() use ($browser) {
     $results = $browser->scrape(new ScrapeRequest(
         url: 'https://example.com',
         elements: [
@@ -222,34 +234,28 @@ try {
         ]
     ));
     
-    if (is_array($results) && count($results) > 0) {
-        echo "✅ Scrape test PASSED - Found " . count($results) . " element groups\n";
-        foreach ($results as $group) {
-            echo "   Selector '{$group->selector}': " . count($group->results) . " elements\n";
-            if (count($group->results) > 0) {
-                echo "     First text: " . substr($group->results[0]->text, 0, 50) . "\n";
-            }
-        }
-        $testResults['scrape'] = true;
-    } else {
-        echo "❌ Scrape test FAILED - No results\n";
-        $testResults['scrape'] = false;
+    if (!is_array($results) || count($results) === 0) {
+        throw new Exception('No results');
     }
-} catch (Exception $e) {
-    dump($e);
-    echo "❌ Scrape test FAILED - " . $e->getMessage() . "\n";
-    $testResults['scrape'] = false;
-}
-echo "\n";
-sleepTenSecond();
+    
+    echo "✅ Scrape test PASSED - Found " . count($results) . " element groups\n";
+    foreach ($results as $group) {
+        echo "   Selector '{$group->selector}': " . count($group->results) . " elements\n";
+        if (count($group->results) > 0) {
+            echo "     First text: " . substr($group->results[0]->text, 0, 50) . "\n";
+        }
+    }
+    return true;
+});
+$testResults['scrape'] = $result['success'];
+sleepBetweenTests();
 
 // ==========================================
 // Test 8: /json - AI Structured Data Extraction
 // ==========================================
 echo "Test 8: Extracting structured data using AI from cloudflare.com...\n";
-echo "   (This may take a few seconds + 1s sleep)...\n";
+echo "   (This may take a few seconds...)\n";
 
-// Define schema inline
 class TestPageInfo
 {
     public function __construct(
@@ -261,7 +267,7 @@ class TestPageInfo
     ) {}
 }
 
-try {
+$result = runTest('JSON', $browser, function() use ($browser) {
     $pageInfo = $browser->json(
         new JsonRequest(
             url: 'https://cloudflare.com',
@@ -270,26 +276,21 @@ try {
         TestPageInfo::class
     );
     
-    if (!empty($pageInfo->title)) {
-        echo "✅ JSON extraction test PASSED\n";
-        echo "   Title: " . $pageInfo->title . "\n";
-        echo "   Description: " . ($pageInfo->description ?? 'N/A') . "\n";
-        $testResults['json'] = true;
-    } else {
-        echo "❌ JSON extraction test FAILED - No title extracted\n";
-        $testResults['json'] = false;
+    if (empty($pageInfo->title)) {
+        throw new Exception('No title extracted');
     }
-} catch (Exception $e) {
-    dump($e);
-    echo "❌ JSON extraction test FAILED - " . $e->getMessage() . "\n";
-    $testResults['json'] = false;
-}
-echo "\n";
+    
+    echo "✅ JSON extraction test PASSED\n";
+    echo "   Title: " . $pageInfo->title . "\n";
+    echo "   Description: " . ($pageInfo->description ?: 'N/A') . "\n";
+    return true;
+});
+$testResults['json'] = $result['success'];
 
 // ==========================================
 // Summary
 // ==========================================
-echo "========================================\n";
+echo "\n========================================\n";
 echo "Test Summary\n";
 echo "========================================\n";
 

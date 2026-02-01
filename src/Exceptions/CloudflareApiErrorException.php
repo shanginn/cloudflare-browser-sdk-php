@@ -10,4 +10,9 @@ class CloudflareApiErrorException extends CloudflareException
     {
         parent::__construct("Cloudflare API Error: {$message}", $statusCode);
     }
+
+    public function getStatusCode(): int
+    {
+        return $this->statusCode;
+    }
 }

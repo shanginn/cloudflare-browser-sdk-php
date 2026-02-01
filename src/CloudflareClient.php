@@ -9,6 +9,7 @@ use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Request;
 use Shanginn\CloudflareBrowser\Exceptions\CloudflareApiErrorException;
 use Shanginn\CloudflareBrowser\Exceptions\CloudflareException;
+use Shanginn\CloudflareBrowser\Exceptions\CloudflareRateLimitException;
 
 final readonly class CloudflareClient implements CloudflareClientInterface
 {
@@ -44,6 +45,13 @@ final readonly class CloudflareClient implements CloudflareClientInterface
                 // Try to parse error message if JSON
                 $data = json_decode($body, true);
                 $msg = $data['errors'][0]['message'] ?? "HTTP $status error";
+                
+                // Handle rate limit (429) specifically
+                if ($status === 429) {
+                    $retryAfter = (int) ($response->getHeader('Retry-After') ?? 0);
+                    throw new CloudflareRateLimitException($msg, $retryAfter);
+                }
+                
                 throw new CloudflareApiErrorException($msg, $status);
             }
 
