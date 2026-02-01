@@ -60,7 +60,7 @@ class CloudflareBrowserTest extends TestCase
                 $data = json_decode($body, true);
                 return $endpoint === 'screenshot' 
                     && $data['url'] === 'https://example.com'
-                    && $data['screenshot_options']['fullPage'] === true
+                    && $data['screenshotOptions']['fullPage'] === true
                     && $data['format'] === 'webp';
             })
             ->andReturn($fakePng);
@@ -84,7 +84,7 @@ class CloudflareBrowserTest extends TestCase
                 $data = json_decode($body, true);
                 return $endpoint === 'pdf' 
                     && $data['url'] === 'https://example.com'
-                    && $data['format'] === 'A4';
+                    && $data['pdfOptions']['format'] === 'a4';
             })
             ->andReturn($fakePdf);
 

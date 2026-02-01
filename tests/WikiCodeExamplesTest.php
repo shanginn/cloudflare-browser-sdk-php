@@ -107,7 +107,7 @@ class WikiCodeExamplesTest extends TestCase
                 $data = json_decode($body, true);
                 return $endpoint === 'screenshot' 
                     && $data['html'] === 'Hello World!'
-                    && $data['screenshot_options']['omitBackground'] === true;
+                    && $data['screenshotOptions']['omitBackground'] === true;
             })
             ->andReturn($fakePng);
 
@@ -186,7 +186,7 @@ class WikiCodeExamplesTest extends TestCase
                 $data = json_decode($body, true);
                 return $endpoint === 'screenshot' 
                     && $data['url'] === 'https://cloudflare.com/'
-                    && $data['screenshot_options']['fullPage'] === true
+                    && $data['screenshotOptions']['fullPage'] === true
                     && $data['viewport']['width'] === 1280
                     && $data['viewport']['height'] === 720
                     && $data['goto_options']['wait_until'] === 'networkidle'
@@ -403,11 +403,11 @@ class WikiCodeExamplesTest extends TestCase
             ->withArgs(function($endpoint, $body) {
                 $data = json_decode($body, true);
                 return $endpoint === 'pdf' 
-                    && $data['format'] === 'A5'
-                    && $data['pdf_options']['displayHeaderFooter'] === true
-                    && $data['pdf_options']['headerTemplate'] === '<div style="font-size: 10px; text-align: center; width: 100%; padding: 5px;"><span>Brand Name</span></div>'
-                    && $data['pdf_options']['margin']['top'] === '70px'
-                    && $data['pdf_options']['margin']['bottom'] === '70px';
+                    && $data['pdfOptions']['format'] === 'a5'
+                    && $data['pdfOptions']['displayHeaderFooter'] === true
+                    && $data['pdfOptions']['headerTemplate'] === '<div style="font-size: 10px; text-align: center; width: 100%; padding: 5px;"><span>Brand Name</span></div>'
+                    && $data['pdfOptions']['margin']['top'] === '70px'
+                    && $data['pdfOptions']['margin']['bottom'] === '70px';
             })
             ->andReturn($fakePdf);
 
@@ -438,10 +438,10 @@ class WikiCodeExamplesTest extends TestCase
             ->withArgs(function($endpoint, $body) {
                 $data = json_decode($body, true);
                 return $endpoint === 'pdf' 
-                    && $data['format'] === 'A4'
-                    && $data['pdf_options']['displayHeaderFooter'] === true
-                    && str_contains($data['pdf_options']['headerTemplate'], 'class="date"')
-                    && str_contains($data['pdf_options']['footerTemplate'], 'class="pageNumber"');
+                    && $data['pdfOptions']['format'] === 'a4'
+                    && $data['pdfOptions']['displayHeaderFooter'] === true
+                    && str_contains($data['pdfOptions']['headerTemplate'], 'class="date"')
+                    && str_contains($data['pdfOptions']['footerTemplate'], 'class="pageNumber"');
             })
             ->andReturn($fakePdf);
 

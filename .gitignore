@@ -3,6 +3,5 @@
 /.phpunit.result.cache
 wiki
 /.env
-/test.php
 /test-*.png
 /test-*.pdf

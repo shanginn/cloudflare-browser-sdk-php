@@ -39,7 +39,31 @@ class CloudflareSerializer
 
     public function serialize(mixed $data): string
     {
-        return $this->serializer->serialize($data, 'json');
+        $json = $this->serializer->serialize($data, 'json');
+        
+        // Fix: Cloudflare API expects camelCase for screenshotOptions
+        if ($data instanceof Requests\ScreenshotRequest) {
+            $json = str_replace('"screenshot_options":', '"screenshotOptions":', $json);
+        }
+        
+        // Fix: Cloudflare API expects camelCase for pdfOptions
+        if ($data instanceof Requests\PdfRequest) {
+            $json = str_replace('"pdf_options":', '"pdfOptions":', $json);
+            
+            // Fix: Cloudflare API expects 'format' inside pdfOptions, not as top-level field
+            // Move format from top-level into pdfOptions
+            $decoded = json_decode($json, true);
+            if (isset($decoded['format']) && $decoded['format'] !== null) {
+                if (!isset($decoded['pdfOptions'])) {
+                    $decoded['pdfOptions'] = [];
+                }
+                $decoded['pdfOptions']['format'] = $decoded['format'];
+                unset($decoded['format']);
+                $json = json_encode($decoded);
+            }
+        }
+        
+        return $json;
     }
 
     public function deserialize(mixed $serialized, string $to): object
