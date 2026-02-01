@@ -26,5 +26,10 @@ class ScreenshotRequest extends BaseRequest
         ...$args
     ) {
         parent::__construct($url, $html, ...$args);
+        
+        // Don't send empty arrays in the request
+        if ($screenshotOptions === []) {
+            $this->screenshotOptions = null;
+        }
     }
 }

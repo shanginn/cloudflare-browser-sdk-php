@@ -22,5 +22,10 @@ class PdfRequest extends BaseRequest
         ...$args
     ) {
         parent::__construct($url, $html, ...$args);
+        
+        // Don't send empty arrays in the request
+        if ($pdfOptions === []) {
+            $this->pdfOptions = null;
+        }
     }
 }
