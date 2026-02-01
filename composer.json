@@ -1,5 +1,7 @@
 {
     "name": "shanginn/cloudflare-browser",
+    "description": "A strongly-typed, modern PHP SDK for the Cloudflare Browser Rendering REST API",
+    "version": "0.1.0",
     "type": "library",
     "license": "MIT",
     "autoload": {
