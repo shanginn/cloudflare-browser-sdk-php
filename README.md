@@ -15,6 +15,22 @@ A strongly-typed, modern PHP SDK for the Cloudflare Browser Rendering REST API. 
 composer require shanginn/cloudflare-browser
 ```
 
+## Documentation
+
+📚 **[View the full Wiki Documentation](../../wiki)** for detailed guides on all endpoints.
+
+### Quick Links
+
+- [Getting Started & REST API Overview](../../wiki/REST-API)
+- [Fetching HTML Content](../../wiki/content-endpoint)
+- [Capturing Screenshots](../../wiki/screenshot-endpoint)
+- [Generating PDFs](../../wiki/pdf-endpoint)
+- [Taking Snapshots](../../wiki/snapshot-endpoint)
+- [Scraping Elements](../../wiki/scrape-endpoint)
+- [AI Structured Data Extraction](../../wiki/json-endpoint)
+- [Retrieving Links](../../wiki/links-endpoint)
+- [Extracting Markdown](../../wiki/markdown-endpoint)
+
 ## Basic Usage
 
 ### Setup
@@ -43,6 +59,13 @@ $pngData = $browser->screenshot(new ScreenshotRequest(
 file_put_contents('screenshot.png', $pngData);
 ```
 
+See the [Screenshot Documentation](../../wiki/screenshot-endpoint) for more examples including:
+- Custom HTML screenshots
+- Authenticated pages
+- Full-page captures
+- Element-specific screenshots
+- High-resolution captures
+
 ### Scrape Elements
 
 ```php
@@ -61,6 +84,8 @@ foreach ($results as $group) {
     }
 }
 ```
+
+See the [Scraping Documentation](../../wiki/scrape-endpoint) for more details.
 
 ## Advanced Usage
 
@@ -102,6 +127,8 @@ $product = $browser->json(
 echo "Product: {$product->title} - \${$product->price}\n";
 ```
 
+See the [JSON Endpoint Documentation](../../wiki/json-endpoint) for more examples including array extraction and custom AI models.
+
 ### Generating PDFs
 
 ```php
@@ -115,6 +142,80 @@ $pdfData = $browser->pdf(new PdfRequest(
 
 file_put_contents('page.pdf', $pdfData);
 ```
+
+See the [PDF Documentation](../../wiki/pdf-endpoint) for more examples including:
+- Custom headers and footers
+- Page format options (A4, A5, Letter, etc.)
+- Blocking images/resources
+- Dynamic placeholders (page numbers, dates, titles)
+
+### Fetch HTML Content
+
+```php
+$html = $browser->content('https://example.com');
+echo $html;
+```
+
+See the [Content Documentation](../../wiki/content-endpoint) for handling JavaScript-heavy pages and blocking resources.
+
+### Extract Markdown
+
+```php
+$markdown = $browser->markdown('https://example.com');
+echo $markdown;
+```
+
+See the [Markdown Documentation](../../wiki/markdown-endpoint) for more details.
+
+### Get All Links
+
+```php
+$links = $browser->links('https://example.com');
+
+// Or get only internal links
+$internalLinks = $browser->links(
+    url: 'https://example.com',
+    excludeExternal: true
+);
+```
+
+See the [Links Documentation](../../wiki/links-endpoint) for more details.
+
+### Take a Snapshot
+
+```php
+use Shanginn\CloudflareBrowser\Requests\SnapshotRequest;
+
+$snapshot = $browser->snapshot(new SnapshotRequest(
+    url: 'https://example.com'
+));
+
+echo "Title: " . $snapshot->title . "\n";
+echo "Content: " . $snapshot->content . "\n";
+```
+
+See the [Snapshot Documentation](../../wiki/snapshot-endpoint) for more examples.
+
+## Authentication
+
+Before you begin, make sure you [create a custom API Token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/) with the following permissions:
+
+* `Browser Rendering - Edit`
+
+Set these environment variables:
+- `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare Account ID
+- `CLOUDFLARE_API_TOKEN` - Your Cloudflare API Token
+
+## Monitoring Usage
+
+You can monitor Browser Rendering usage in two ways:
+
+* In the Cloudflare dashboard, go to the **Browser Rendering** page to view aggregate metrics. [Go to **Browser Rendering**](https://dash.cloudflare.com/?to=/:account/workers/browser-rendering)
+* `X-Browser-Ms-Used` header: Returned in every REST API response, reporting browser time used for that request (in milliseconds).
+
+## Troubleshooting
+
+If you have questions or encounter an error, see the [Browser Rendering FAQ and troubleshooting guide](https://developers.cloudflare.com/browser-rendering/faq/).
 
 ## License
 
